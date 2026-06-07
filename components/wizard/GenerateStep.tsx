@@ -66,7 +66,7 @@ async function getApiKey(): Promise<string> {
 async function generateDiagram(label: string, grade: number): Promise<ArrayBuffer | null> {
   try {
     const apiKey = await getApiKey();
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-image-generation:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`;
     const prompt = `Generate a simple, clear, black and white labeled educational diagram of "${label}" for a Grade ${grade} science exam paper. Style: clean line art, no color, no shading, clear text labels with arrows pointing to parts. White background. Suitable for printing on paper.`;
 
     const res = await fetch(url, {
