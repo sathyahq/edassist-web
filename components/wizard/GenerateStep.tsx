@@ -25,47 +25,84 @@ interface Props {
 
 const STATUS_MESSAGES: Record<Status, string> = {
   idle: "",
-  sending: "Sending chapters to AI...",
-  generating: "Generating questions... This takes about 30 seconds",
+  sending: "Connecting to AI...",
+  generating: "Generating questions... This takes about 30-60 seconds",
   reviewing: "Reviewing quality... Almost done",
   building: "Building your question paper...",
   done: "Your question paper is ready!",
   error: "",
 };
 
+let cachedApiKey: string | null = null;
+
+async function getApiKey(): Promise<string> {
+  if (cachedApiKey) return cachedApiKey;
+  const res = await fetch("/api/get-key");
+  if (!res.ok) {
+    throw new Error("API key not configured on server");
+  }
+  const data = await res.json();
+  if (!data.key) throw new Error("API key missing");
+  cachedApiKey = data.key;
+  return data.key;
+}
+
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+  const apiKey = await getApiKey();
+
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+
   let response: Response;
   try {
-    response = await fetch("/api/generate", {
+    response = await fetch(geminiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ systemPrompt, userPrompt }),
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.4,
+        },
+      }),
     });
   } catch (networkErr) {
-    throw new Error(`Network error: ${networkErr instanceof Error ? networkErr.message : "Failed to connect"}`);
+    throw new Error(`Network error: ${networkErr instanceof Error ? networkErr.message : "Failed to connect to AI"}`);
   }
 
   if (!response.ok) {
-    const rawText = await response.text().catch(() => "");
-    let errorMessage: string;
-    try {
-      const err = JSON.parse(rawText);
-      errorMessage = err.error || `HTTP ${response.status}`;
-    } catch {
-      errorMessage = `HTTP ${response.status}: ${rawText.slice(0, 300) || response.statusText}`;
+    const errText = await response.text().catch(() => "");
+    if (response.status === 429) {
+      throw new Error("AI rate limit hit. Wait a minute and try again.");
     }
-    throw new Error(errorMessage);
+    throw new Error(`AI error (${response.status}): ${errText.slice(0, 300)}`);
   }
 
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("No response stream");
+  if (!reader) throw new Error("No response stream from AI");
 
   const decoder = new TextDecoder();
   let fullText = "";
+  let buffer = "";
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    fullText += decoder.decode(value, { stream: true });
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6).trim();
+      if (!data || data === "[DONE]") continue;
+      try {
+        const parsed = JSON.parse(data);
+        const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) fullText += text;
+      } catch {
+        // partial SSE chunk, skip
+      }
+    }
   }
 
   if (!fullText.trim()) {
