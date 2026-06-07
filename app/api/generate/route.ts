@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/build-prompt";
 import { buildReviewPrompt } from "@/lib/prompts/review-prompt";
 
@@ -18,44 +17,71 @@ export async function POST(request: Request) {
       return Response.json({ error: "API key not configured" }, { status: 500 });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.4,
-      },
-    });
-
     const systemPrompt = buildSystemPrompt();
     let userPrompt: string;
     if (reviewMode && paperToReview) {
       userPrompt = buildReviewPrompt(paperToReview, grade);
     } else {
-      userPrompt = buildUserPrompt({
-        grade,
-        subject,
-        examName,
-        date,
-        duration,
-        totalMarks,
-        chapters,
-      });
+      userPrompt = buildUserPrompt({ grade, subject, examName, date, duration, totalMarks, chapters });
     }
 
-    const result = await model.generateContentStream({
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      systemInstruction: { role: "model", parts: [{ text: systemPrompt }] },
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+    const geminiResponse = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.4,
+        },
+      }),
     });
 
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      return Response.json(
+        { error: `Gemini API error (${geminiResponse.status}): ${errText.slice(0, 300)}` },
+        { status: 502 }
+      );
+    }
+
+    const reader = geminiResponse.body?.getReader();
+    if (!reader) {
+      return Response.json({ error: "No response stream from Gemini" }, { status: 502 });
+    }
+
+    const decoder = new TextDecoder();
     const encoder = new TextEncoder();
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (text) {
-              controller.enqueue(encoder.encode(text));
+          let buffer = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const data = line.slice(6).trim();
+              if (!data || data === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  controller.enqueue(encoder.encode(text));
+                }
+              } catch {
+                // skip malformed SSE chunks
+              }
             }
           }
           controller.close();
@@ -66,10 +92,7 @@ export async function POST(request: Request) {
     });
 
     return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Transfer-Encoding": "chunked",
-      },
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Generation failed";
