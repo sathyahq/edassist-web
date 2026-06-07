@@ -6,6 +6,8 @@ import { paperContentSchema } from "@/lib/schemas/paper-content";
 import { buildQuestionPaper } from "@/lib/docx-builder/question-paper";
 import { buildAnswerKey } from "@/lib/docx-builder/answer-key";
 import { processLogoForDocx } from "@/lib/image-utils";
+import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/build-prompt";
+import { buildReviewPrompt } from "@/lib/prompts/review-prompt";
 import type { ExamConfig, PaperContent } from "@/lib/docx-builder/types";
 import type { ExtractedChapter } from "@/lib/pdf-extract";
 import type { ExamConfigData } from "./ExamConfigStep";
@@ -31,6 +33,31 @@ const STATUS_MESSAGES: Record<Status, string> = {
   error: "",
 };
 
+async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+  const response = await fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ systemPrompt, userPrompt }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Generation failed" }));
+    throw new Error(err.error || "Generation failed");
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response stream");
+
+  const decoder = new TextDecoder();
+  let fullText = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    fullText += decoder.decode(value, { stream: true });
+  }
+  return fullText;
+}
+
 export default function GenerateStep({
   schoolName,
   logoFile,
@@ -53,75 +80,32 @@ export default function GenerateStep({
     setAkBlob(null);
 
     try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          grade: examConfig.grade,
-          subject: examConfig.subject,
-          examName: examConfig.examName,
-          date: dateFormatted,
-          duration: examConfig.duration,
-          totalMarks: examConfig.totalMarks,
-          chapters: chapters.map((ch) => ({ filename: ch.filename, text: ch.text })),
-        }),
+      const systemPrompt = buildSystemPrompt();
+      const userPrompt = buildUserPrompt({
+        grade: examConfig.grade,
+        subject: examConfig.subject,
+        examName: examConfig.examName,
+        date: dateFormatted,
+        duration: examConfig.duration,
+        totalMarks: examConfig.totalMarks,
+        chapters: chapters.map((ch) => ({ filename: ch.filename, text: ch.text })),
       });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: "Generation failed" }));
-        throw new Error(err.error || "Generation failed");
-      }
 
       setStatus("generating");
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response stream");
-
-      const decoder = new TextDecoder();
-      let fullText = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        fullText += decoder.decode(value, { stream: true });
-      }
-
+      const fullText = await callGemini(systemPrompt, userPrompt);
       const parsed = JSON.parse(fullText);
 
-      // Review pass — ask Gemini to check its own work
+      // Review pass
       setStatus("reviewing");
-      const reviewResponse = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          grade: examConfig.grade,
-          subject: examConfig.subject,
-          examName: examConfig.examName,
-          date: dateFormatted,
-          duration: examConfig.duration,
-          totalMarks: examConfig.totalMarks,
-          chapters: [],
-          reviewMode: true,
-          paperToReview: JSON.stringify(parsed),
-        }),
-      });
-
-      if (reviewResponse.ok) {
-        const reviewReader = reviewResponse.body?.getReader();
-        if (reviewReader) {
-          let reviewText = "";
-          while (true) {
-            const { done, value } = await reviewReader.read();
-            if (done) break;
-            reviewText += decoder.decode(value, { stream: true });
-          }
-          try {
-            const review = JSON.parse(reviewText);
-            if (review.fixedPaper) {
-              Object.assign(parsed, review.fixedPaper);
-            }
-          } catch {}
+      try {
+        const reviewPrompt = buildReviewPrompt(JSON.stringify(parsed), examConfig.grade);
+        const reviewText = await callGemini(systemPrompt, reviewPrompt);
+        const review = JSON.parse(reviewText);
+        if (review.fixedPaper) {
+          Object.assign(parsed, review.fixedPaper);
         }
+      } catch {
+        // review is optional — continue with original
       }
 
       const validated = paperContentSchema.parse(parsed) as PaperContent;

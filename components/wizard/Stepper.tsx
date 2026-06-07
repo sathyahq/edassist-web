@@ -1,10 +1,9 @@
 "use client";
 
 const STEPS = [
-  { num: 1, label: "School" },
-  { num: 2, label: "Exam" },
-  { num: 3, label: "Chapters" },
-  { num: 4, label: "Generate" },
+  { num: 1, label: "Exam" },
+  { num: 2, label: "Chapters" },
+  { num: 3, label: "Generate" },
 ];
 
 interface StepperProps {

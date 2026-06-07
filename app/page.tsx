@@ -2,21 +2,15 @@
 
 import { useState } from "react";
 import Stepper from "@/components/wizard/Stepper";
-import SchoolInfoStep from "@/components/wizard/SchoolInfoStep";
 import ExamConfigStep, { type ExamConfigData } from "@/components/wizard/ExamConfigStep";
 import ChapterUploadStep from "@/components/wizard/ChapterUploadStep";
 import GenerateStep from "@/components/wizard/GenerateStep";
 import type { ExtractedChapter } from "@/lib/pdf-extract";
 
-interface SchoolInfo {
-  schoolName: string;
-  logoFile: File | null;
-  logoPreview: string | null;
-}
+const SCHOOL_NAME = "Dr. Dasarathan International School, Coimbatore";
 
 export default function Home() {
   const [step, setStep] = useState(1);
-  const [schoolInfo, setSchoolInfo] = useState<SchoolInfo | null>(null);
   const [examConfig, setExamConfig] = useState<ExamConfigData | null>(null);
   const [chapters, setChapters] = useState<ExtractedChapter[]>([]);
 
@@ -31,41 +25,32 @@ export default function Home() {
 
       <div className="pt-4 pb-8">
         {step === 1 && (
-          <SchoolInfoStep
-            onNext={(info) => {
-              setSchoolInfo(info);
+          <ExamConfigStep
+            onNext={(config) => {
+              setExamConfig(config);
               setStep(2);
             }}
+            onBack={() => {}}
           />
         )}
 
         {step === 2 && (
-          <ExamConfigStep
-            onNext={(config) => {
-              setExamConfig(config);
+          <ChapterUploadStep
+            onNext={(chs) => {
+              setChapters(chs);
               setStep(3);
             }}
             onBack={() => setStep(1)}
           />
         )}
 
-        {step === 3 && (
-          <ChapterUploadStep
-            onNext={(chs) => {
-              setChapters(chs);
-              setStep(4);
-            }}
-            onBack={() => setStep(2)}
-          />
-        )}
-
-        {step === 4 && schoolInfo && examConfig && (
+        {step === 3 && examConfig && (
           <GenerateStep
-            schoolName={schoolInfo.schoolName}
-            logoFile={schoolInfo.logoFile}
+            schoolName={SCHOOL_NAME}
+            logoFile={null}
             examConfig={examConfig}
             chapters={chapters}
-            onGenerateAnother={() => setStep(2)}
+            onGenerateAnother={() => setStep(1)}
           />
         )}
       </div>

@@ -133,9 +133,6 @@ export default function ExamConfigStep({ onNext, onBack }: Props) {
       </div>
 
       <div className="flex gap-3 mt-4">
-        <Button variant="outline" onClick={onBack} className="flex-1 h-14 text-lg rounded-xl">
-          ← Back
-        </Button>
         <Button
           onClick={handleNext}
           disabled={!isValid}

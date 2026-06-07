@@ -1,28 +1,16 @@
-import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/build-prompt";
-import { buildReviewPrompt } from "@/lib/prompts/review-prompt";
-
 export const runtime = "edge";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { grade, subject, examName, date, duration, totalMarks, chapters, reviewMode, paperToReview } = body;
+    const { systemPrompt, userPrompt } = await request.json();
 
-    if (!reviewMode && (!chapters?.length || !grade || !subject)) {
-      return Response.json({ error: "Missing required fields" }, { status: 400 });
+    if (!systemPrompt || !userPrompt) {
+      return Response.json({ error: "Missing prompts" }, { status: 400 });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return Response.json({ error: "API key not configured" }, { status: 500 });
-    }
-
-    const systemPrompt = buildSystemPrompt();
-    let userPrompt: string;
-    if (reviewMode && paperToReview) {
-      userPrompt = buildReviewPrompt(paperToReview, grade);
-    } else {
-      userPrompt = buildUserPrompt({ grade, subject, examName, date, duration, totalMarks, chapters });
     }
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
@@ -43,14 +31,14 @@ export async function POST(request: Request) {
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
       return Response.json(
-        { error: `Gemini API error (${geminiResponse.status}): ${errText.slice(0, 300)}` },
+        { error: `Gemini error (${geminiResponse.status}): ${errText.slice(0, 500)}` },
         { status: 502 }
       );
     }
 
     const reader = geminiResponse.body?.getReader();
     if (!reader) {
-      return Response.json({ error: "No response stream from Gemini" }, { status: 502 });
+      return Response.json({ error: "No response stream" }, { status: 502 });
     }
 
     const decoder = new TextDecoder();
@@ -63,25 +51,18 @@ export async function POST(request: Request) {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
             buffer = lines.pop() || "";
-
             for (const line of lines) {
               if (!line.startsWith("data: ")) continue;
               const data = line.slice(6).trim();
               if (!data || data === "[DONE]") continue;
-
               try {
                 const parsed = JSON.parse(data);
                 const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) {
-                  controller.enqueue(encoder.encode(text));
-                }
-              } catch {
-                // skip malformed SSE chunks
-              }
+                if (text) controller.enqueue(encoder.encode(text));
+              } catch {}
             }
           }
           controller.close();
