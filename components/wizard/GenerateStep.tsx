@@ -12,6 +12,7 @@ import type { ExamConfig, PaperContent } from "@/lib/docx-builder/types";
 import type { ExtractedChapter } from "@/lib/pdf-extract";
 import type { ExamConfigData } from "./ExamConfigStep";
 import { ROMAN } from "@/lib/constants";
+import { normalizeGeminiOutput } from "@/lib/normalize-output";
 
 type Status = "idle" | "sending" | "generating" | "reviewing" | "building" | "done" | "error";
 
@@ -167,7 +168,8 @@ export default function GenerateStep({
         // review is optional — continue with original
       }
 
-      const validated = paperContentSchema.parse(parsed) as PaperContent;
+      const normalized = normalizeGeminiOutput(parsed);
+      const validated = paperContentSchema.parse(normalized) as PaperContent;
 
       setStatus("building");
 

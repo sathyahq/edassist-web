@@ -69,9 +69,11 @@ export async function buildQuestionPaper(
     mkP(trB(content.matchA.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
     matchTable(content.matchA.colA, content.matchA.colB, content.matchA.nums),
     ...blankP(1),
-    mkP(trB(content.matchB.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
-    matchTable(content.matchB.colA, content.matchB.colB, content.matchB.nums),
-    ...blankP(1),
+    ...(content.matchB ? [
+      mkP(trB(content.matchB.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
+      matchTable(content.matchB.colA, content.matchB.colB, content.matchB.nums),
+      ...blankP(1),
+    ] : []),
 
     // VII. Odd One Out
     sectionHead("VII", "Identify the odd one out.", "5 × ½ = 2½"),

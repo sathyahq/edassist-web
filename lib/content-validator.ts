@@ -19,6 +19,7 @@ export function validatePaperContent(content: PaperContent): ValidationResult {
 
   // 2. Match Column B shuffle validation — no positional matches
   [content.matchA, content.matchB].forEach((match, setIdx) => {
+    if (!match) return;
     const setLabel = setIdx === 0 ? "A" : "B";
     match.nums.forEach((num, i) => {
       const expectedLetter = String.fromCharCode(97 + i);

@@ -61,11 +61,13 @@ export async function buildAnswerKey(
       mkP(tr(`  ${k} → ${v}`, { size: S_SZ }), { spaceAft: 10 })
     ),
     ...blankP(1),
-    mkP(trB(content.matchB.title, S_SZ), { spaceBef: 20, spaceAft: 20 }),
-    ...Object.entries(content.matchB.answers).map(([k, v]) =>
-      mkP(tr(`  ${k} → ${v}`, { size: S_SZ }), { spaceAft: 10 })
-    ),
-    ...blankP(1),
+    ...(content.matchB ? [
+      mkP(trB(content.matchB.title, S_SZ), { spaceBef: 20, spaceAft: 20 }),
+      ...Object.entries(content.matchB.answers).map(([k, v]) =>
+        mkP(tr(`  ${k} → ${v}`, { size: S_SZ }), { spaceAft: 10 })
+      ),
+      ...blankP(1),
+    ] : []),
 
     // VII. Odd One Out Answers
     sectionHead("VII", "Odd one out — ANSWERS", "5 × ½ = 2½"),

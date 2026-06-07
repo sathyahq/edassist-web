@@ -1,7 +1,7 @@
 export interface McqItem {
   q: string;
-  opts: [string, string, string, string];
-  ans: "a" | "b" | "c" | "d";
+  opts: string[];
+  ans: string;
   bloom: string;
 }
 
@@ -36,12 +36,12 @@ export interface MatchSet {
 
 export interface PaperContent {
   mcqs: McqItem[];
-  fibs: [string, string][];
+  fibs: string[][];
   whoAmI: ClueItem[];
   nameFollowing: QAItem[];
   giveExamples: QAItem[];
   matchA: MatchSet;
-  matchB: MatchSet;
+  matchB?: MatchSet | null;
   oddOnes: OddOneItem[];
   reasons: ReasonItem[];
   shortAnswers: QAItem[];
