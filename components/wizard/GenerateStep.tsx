@@ -383,9 +383,8 @@ export default function GenerateStep({
     } catch (err) {
       setStatus("error");
       if (err instanceof ZodError) {
-        const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
-        console.error("Zod validation errors:", issues);
-        setErrorMsg(`Format error: ${issues.slice(0, 300)}`);
+        console.error("Zod validation errors:", err.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
+        setErrorMsg("AI response didn't match expected format. Please try again — each run varies slightly.");
       } else {
         setErrorMsg(
           err instanceof Error
