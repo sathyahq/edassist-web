@@ -10,24 +10,22 @@ export function validatePaperContent(content: PaperContent): ValidationResult {
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  // 1. FIB blanks must be at end of sentence
+  // 1. FIB blanks check — verify sentence contains a blank placeholder
   content.fibs.forEach(([sentence], i) => {
-    if (sentence.includes("___") && !sentence.trim().endsWith("___")) {
-      warnings.push(`FIB ${i + 1}: Blank appears to be in the middle of the sentence, not at the end.`);
+    if (!sentence.includes("___") && !sentence.includes("______")) {
+      warnings.push(`FIB ${i + 1}: Sentence does not appear to contain a blank placeholder.`);
     }
   });
 
   // 2. Match Column B shuffle validation — no positional matches
-  [content.matchA, content.matchB].forEach((match, setIdx) => {
-    if (!match) return;
-    const setLabel = setIdx === 0 ? "A" : "B";
-    match.nums.forEach((num, i) => {
+  if (content.match) {
+    content.match.nums.forEach((num, i) => {
       const expectedLetter = String.fromCharCode(97 + i);
-      if (match.answers[num] === expectedLetter) {
-        errors.push(`Match Set ${setLabel}: Item ${num} maps to "${expectedLetter}" — positional match detected. Column B not shuffled.`);
+      if (content.match!.answers[num] === expectedLetter) {
+        errors.push(`Match: Item ${num} maps to "${expectedLetter}" — positional match detected. Column B not shuffled.`);
       }
     });
-  });
+  }
 
   // 3. Concept repetition detection — keyword overlap across sections
   const conceptMap = new Map<string, string[]>();
@@ -57,23 +55,34 @@ export function validatePaperContent(content: PaperContent): ValidationResult {
 
   conceptMap.forEach((sections, keyword) => {
     const uniqueSections = [...new Set(sections)];
-    if (uniqueSections.length >= 3) {
+    if (uniqueSections.length >= 2) {
       warnings.push(`Concept "${keyword}" appears across ${uniqueSections.length} sections (${uniqueSections.join(", ")}). Possible repetition.`);
     }
   });
 
-  // 4. MCQ option length balance — flag if one option is 3x longer
+  // 4. MCQ option length balance — flag if one option is 1.8x longer than average
   content.mcqs.forEach((mcq, i) => {
     const lengths = mcq.opts.map(o => o.length);
     const avg = lengths.reduce((a, b) => a + b, 0) / lengths.length;
     lengths.forEach((len, j) => {
-      if (len > avg * 2.5) {
+      if (len > avg * 1.8) {
         warnings.push(`MCQ ${i + 1}, option ${String.fromCharCode(97 + j)}: Significantly longer than other options — may give away the answer.`);
       }
     });
   });
 
-  // 5. Chapter distribution — ensure every chapter has ≥2 questions
+  // 5. Who Am I answer leakage — answer word should not appear in clue
+  content.whoAmI.forEach((w, i) => {
+    const ansWords = w.ans.toLowerCase().split(/\s+/).filter(word => word.length > 3);
+    const clueText = w.clue.toLowerCase();
+    ansWords.forEach(word => {
+      if (clueText.includes(word)) {
+        warnings.push(`Who Am I ${i + 1}: Answer word "${word}" appears in the clue text — answer leakage.`);
+      }
+    });
+  });
+
+  // 6. Chapter distribution — ensure every chapter has ≥2 questions
   if (content.chapterDistribution) {
     Object.entries(content.chapterDistribution).forEach(([chapter, count]) => {
       if (count < 2) {

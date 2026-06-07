@@ -2,6 +2,7 @@ import {
   Paragraph, TextRun, Table, TableRow, TableCell,
   AlignmentType, WidthType, BorderStyle, ImageRun,
   LineRuleType, convertInchesToTwip, Document, Packer,
+  PageBreak, Footer, PageNumber,
 } from "docx";
 import type { ExamConfig } from "./types";
 
@@ -55,7 +56,10 @@ export const ruleLine = (label = "", w = 75) =>
   mkP([tr(label + "_".repeat(w))], { spaceAft: 30 });
 
 export const writeLines = (n = 3) =>
-  Array.from({ length: n }, () => ruleLine("", 90));
+  Array.from({ length: n }, () => ruleLine("", 65));
+
+export const pgBreak = () =>
+  new Paragraph({ children: [new PageBreak()] });
 
 export const NO_BORDER = {
   top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
@@ -294,10 +298,10 @@ export function buildSchoolHeader(config: ExamConfig, isAK: boolean): (Table | P
       }),
       new TableRow({
         children: [
-          boxCell([mkP(tr("Sub    :  " + config.subjectDisplay, { size: S_SZ }))], { w: 30 }),
-          boxCell([mkP(tr("Marks :  " + config.totalMarks, { size: S_SZ }))], { w: 20 }),
-          boxCell([mkP(tr("Date  :  " + config.date + "      Roll No: _______", { size: S_SZ }))], { w: 35 }),
-          boxCell([mkP(tr("Dur   :  " + config.duration, { size: S_SZ }))], { w: 15 }),
+          boxCell([mkP(tr("Sub    :  " + config.subjectDisplay, { size: S_SZ }))], { w: 25 }),
+          boxCell([mkP(tr("Marks :  " + config.totalMarks, { size: S_SZ }))], { w: 18 }),
+          boxCell([mkP(tr("Date  :  " + config.date + "      Roll No: _______", { size: S_SZ }))], { w: 30 }),
+          boxCell([mkP(tr("Dur   :  " + config.duration, { size: S_SZ }))], { w: 27 }),
         ],
       }),
     ],
@@ -311,6 +315,35 @@ export function cInstr(text: string): Paragraph {
   return mkP(trI(text, S_SZ), { spaceAft: 60 });
 }
 
+export function generalInstructions(totalMarks: number, duration: string): Table {
+  const instructions = [
+    "All questions are compulsory.",
+    `Maximum Marks: ${totalMarks}.  Time Allowed: ${duration}.`,
+    "Read each question carefully before writing your answer.",
+    "Marks for each section are indicated on the right side.",
+  ];
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: BOX_BORDER,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            borders: BOX_BORDER,
+            margins: { top: 60, bottom: 60, left: 100, right: 100 },
+            children: [
+              mkP(trB("General Instructions:", S_SZ), { spaceAft: 40 }),
+              ...instructions.map((instr, i) =>
+                mkP(tr(`${i + 1}. ${instr}`, { size: 18, italic: true }), { spaceAft: 20 })
+              ),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
 export async function buildDocxBlob(children: (Table | Paragraph)[]): Promise<Blob> {
   const doc = new Document({
     sections: [
@@ -320,6 +353,21 @@ export async function buildDocxBlob(children: (Table | Paragraph)[]): Promise<Bl
             size: { width: 12240, height: 15840 },
             margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
           },
+        },
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "Page ", font: FONT, size: 16 }),
+                  new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 16 }),
+                  new TextRun({ text: " of ", font: FONT, size: 16 }),
+                  new TextRun({ children: [PageNumber.TOTAL_PAGES], font: FONT, size: 16 }),
+                ],
+              }),
+            ],
+          }),
         },
         children,
       },

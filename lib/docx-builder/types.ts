@@ -40,8 +40,7 @@ export interface PaperContent {
   whoAmI: ClueItem[];
   nameFollowing: QAItem[];
   giveExamples: QAItem[];
-  matchA?: MatchSet | null;
-  matchB?: MatchSet | null;
+  match: MatchSet | null;
   oddOnes: OddOneItem[];
   reasons: ReasonItem[];
   shortAnswers: QAItem[];
@@ -62,6 +61,7 @@ export interface ExamConfig {
   gradeDisplay: string;
   subject: string;
   subjectDisplay: string;
+  subjectType: "science" | "social-studies" | "general";
   examName: string;
   date: string;
   duration: string;

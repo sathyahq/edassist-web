@@ -156,3 +156,86 @@
     font-size: 16px !important;
   }
 }
+
+/* --- EdAssist Design System Additions --- */
+
+/* Card utility */
+.ea-card {
+  @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-5;
+}
+
+/* Fade-in page transition */
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulse animation for progress dots */
+.pulse-dot {
+  animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(13, 148, 136, 0);
+  }
+}
+
+/* Success checkmark scale-in animation */
+.check-anim {
+  animation: scaleIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Upload zone animated dashed border */
+.upload-zone-border {
+  animation: borderPulse 2s ease-in-out infinite;
+}
+
+@keyframes borderPulse {
+  0%, 100% {
+    border-color: #99f6e4;
+  }
+  50% {
+    border-color: #0d9488;
+  }
+}
+
+/* Toast slide-in */
+.toast-in {
+  animation: toastSlide 0.3s ease-out;
+}
+
+@keyframes toastSlide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

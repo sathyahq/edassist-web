@@ -13,30 +13,57 @@ interface StepperProps {
 
 export default function Stepper({ current, onStepClick }: StepperProps) {
   return (
-    <div className="flex justify-center gap-2 px-4 py-4">
-      {STEPS.map((step) => {
+    <div className="flex items-center justify-center px-6 py-4">
+      {STEPS.map((step, index) => {
         const isCompleted = step.num < current;
         const isCurrent = step.num === current;
         const isClickable = step.num < current;
 
         return (
-          <button
-            key={step.num}
-            onClick={() => isClickable && onStepClick(step.num)}
-            disabled={!isClickable}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-colors ${
-              isCurrent
-                ? "bg-teal-600 text-white"
-                : isCompleted
-                ? "bg-teal-100 text-teal-700 active:bg-teal-200"
-                : "bg-gray-100 text-gray-400"
-            }`}
-          >
-            <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-white/20">
-              {isCompleted ? "✓" : step.num}
-            </span>
-            <span className="hidden sm:inline">{step.label}</span>
-          </button>
+          <div key={step.num} className="flex items-center">
+            {/* Step circle + label */}
+            <div className="flex flex-col items-center">
+              <button
+                onClick={() => isClickable && onStepClick(step.num)}
+                disabled={!isClickable}
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                  isCompleted
+                    ? "bg-teal-600 text-white cursor-pointer active:scale-95"
+                    : isCurrent
+                    ? "bg-white border-2 border-teal-600 text-teal-600 pulse-dot"
+                    : "bg-gray-100 border-2 border-gray-200 text-gray-400"
+                }`}
+              >
+                {isCompleted ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  step.num
+                )}
+              </button>
+              <span
+                className={`text-xs mt-1.5 font-semibold ${
+                  isCompleted
+                    ? "text-teal-700"
+                    : isCurrent
+                    ? "text-teal-600"
+                    : "text-gray-400"
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+
+            {/* Connecting line (not after last step) */}
+            {index < STEPS.length - 1 && (
+              <div
+                className={`w-12 h-0.5 mx-2 mb-5 rounded-full transition-colors ${
+                  step.num < current ? "bg-teal-500" : "bg-gray-200"
+                }`}
+              />
+            )}
+          </div>
         );
       })}
     </div>

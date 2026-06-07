@@ -17,9 +17,9 @@ const oddOneSchema = z.object({
 });
 const matchSetSchema = z.object({
   title: z.string(),
-  colA: z.array(z.string()).min(2),
-  colB: z.array(z.string()).min(2),
-  nums: z.array(z.string()).min(2),
+  colA: z.array(z.string()).min(3),
+  colB: z.array(z.string()).min(3),
+  nums: z.array(z.string()).min(3),
   answers: z.record(z.string(), z.string()),
 });
 
@@ -29,8 +29,7 @@ export const paperContentSchema = z.object({
   whoAmI: z.array(clueSchema).min(1),
   nameFollowing: z.array(qaSchema).min(1),
   giveExamples: z.array(qaSchema).min(1),
-  matchA: matchSetSchema.nullable().optional(),
-  matchB: matchSetSchema.nullable().optional(),
+  match: matchSetSchema.nullable().optional(),
   oddOnes: z.array(oddOneSchema).min(1),
   reasons: z.array(reasonSchema).min(1),
   shortAnswers: z.array(qaSchema).min(1),

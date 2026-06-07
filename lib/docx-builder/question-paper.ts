@@ -4,32 +4,44 @@ import {
   tr, trB, trI, mkP, blankP, ruleLine, writeLines,
   sectionHead, matchTable, passageBox, placeholderBox,
   cInstr, buildSchoolHeader, buildDocxBlob, B_SZ, S_SZ,
+  pgBreak, generalInstructions,
 } from "./common";
 
 export async function buildQuestionPaper(
   content: PaperContent,
   config: ExamConfig
 ): Promise<Blob> {
-  const isScience = !!content.thinkAnswers;
-  const isSocialStudies = !!content.sourcePassage;
+  const isScience = config.subjectType === "science";
+  const isSocialStudies = config.subjectType === "social-studies";
   const sectionXITitle = getSectionXITitle(config.grade, isScience);
 
   const children: (Table | Paragraph)[] = [
     ...buildSchoolHeader(config, false),
+    generalInstructions(config.totalMarks, config.duration),
+    ...blankP(1),
 
     // I. MCQ
     sectionHead("I", "Choose the correct answer.", "10 × ½ = 5"),
     cInstr("(Choose the most appropriate option. Write only the letter of the correct answer on the line provided.)"),
-    ...content.mcqs.flatMap((mcq) => [
-      mkP(tr(mcq.q), { spaceBef: 60, spaceAft: 30 }),
-      ...mcq.opts.map((o) => mkP(tr("    " + o, { size: B_SZ }), { spaceAft: 20 })),
-      ruleLine("    Answer: ", 52),
-      ...blankP(1),
-    ]),
+    ...content.mcqs.flatMap((mcq, i) => {
+      const cleanQ = mcq.q.replace(/^\s*(?:Q?\d+[\.\)\s]+)/i, "");
+      return [
+        mkP(tr(`${i + 1}. ${cleanQ}`), { spaceBef: 60, spaceAft: 30 }),
+        ...mcq.opts.map((o, j) => {
+          const cleanOpt = o.replace(/^\s*(?:\(?[a-dA-D1-4]\)?[\.\)\s]+)/, "");
+          const letter = String.fromCharCode(97 + j);
+          return mkP(tr(`    ${letter}) ${cleanOpt}`, { size: B_SZ }), { spaceAft: 20 });
+        }),
+        ...blankP(1),
+      ];
+    }),
+
+    // --- Page break after MCQs ---
+    pgBreak(),
 
     // II. Fill in the Blanks
     sectionHead("II", "Fill in the blanks.", "10 × ½ = 5"),
-    cInstr("(Complete each sentence with the correct word or phrase. The blank is always at the end of the sentence.)"),
+    cInstr("(Complete each sentence with the correct word or phrase.)"),
     ...content.fibs.map(([sentence], i) =>
       mkP(tr(`${i + 1}.  ${sentence} _________________________.`), { spaceBef: 40, spaceAft: 30 })
     ),
@@ -53,6 +65,9 @@ export async function buildQuestionPaper(
       ...blankP(1),
     ]),
 
+    // --- Page break before Examples/Match/Odd ---
+    pgBreak(),
+
     // V. Give Two Examples
     sectionHead("V", "Give two examples for each of the following.", "5 × 1 = 5"),
     cInstr("(Write two correct examples on the lines provided. ½ mark for each example.)"),
@@ -66,14 +81,9 @@ export async function buildQuestionPaper(
     sectionHead("VI", "Match the following.", "5 × ½ = 2½"),
     cInstr("(Write the matching letter or number in the Answer column.)"),
     ...blankP(1),
-    ...(content.matchA ? [
-      mkP(trB(content.matchA.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
-      matchTable(content.matchA.colA, content.matchA.colB, content.matchA.nums),
-      ...blankP(1),
-    ] : []),
-    ...(content.matchB ? [
-      mkP(trB(content.matchB.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
-      matchTable(content.matchB.colA, content.matchB.colB, content.matchB.nums),
+    ...(content.match ? [
+      mkP(trB(content.match.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
+      matchTable(content.match.colA, content.match.colB, content.match.nums),
       ...blankP(1),
     ] : []),
 
@@ -86,6 +96,9 @@ export async function buildQuestionPaper(
       ...blankP(1),
     ]),
 
+    // --- Page break before long-answer sections ---
+    pgBreak(),
+
     // VIII. Give Reasons
     sectionHead("VIII", "Give reasons for the following.", "4 × 1 = 4"),
     cInstr("(Write one clear, complete reason for each question.)"),
@@ -96,11 +109,11 @@ export async function buildQuestionPaper(
     ]),
 
     // IX. Short Answer
-    sectionHead("IX", "Answer the following in short.  (3–4 sentences)", "5 × 2 = 10"),
-    cInstr("(Write your answer on the lines provided. Aim for 3–4 clear, complete sentences.)"),
+    sectionHead("IX", `Answer the following in short.  (${config.grade <= 2 ? "1–2 sentences" : config.grade === 3 ? "2–3 sentences" : "3–4 sentences"})`, "5 × 2 = 10"),
+    cInstr(`(Write your answer on the lines provided. Aim for ${config.grade <= 2 ? "1–2" : config.grade === 3 ? "2–3" : "3–4"} clear, complete sentences.)`),
     ...content.shortAnswers.flatMap((sa) => [
       mkP(trB(sa.q), { spaceBef: 80, spaceAft: 30 }),
-      ...writeLines(5),
+      ...writeLines(config.grade <= 2 ? 3 : 5),
       ...blankP(1),
     ]),
   ];
@@ -108,8 +121,23 @@ export async function buildQuestionPaper(
   // X. Subject-specific
   if (isScience && content.thinkAnswers) {
     children.push(
+      pgBreak(),
       sectionHead("X", "Think and Answer.", "1 × 3 = 3"),
-      cInstr("(Use your understanding to answer each question in 1–2 sentences.)"),
+      cInstr("(Use your understanding to answer each question in 3–4 sentences.)"),
+      ...blankP(1),
+      ...content.thinkAnswers.flatMap((ta) => [
+        mkP(trB(ta.q, B_SZ), { spaceBef: 40, spaceAft: 20 }),
+        ...writeLines(4),
+      ]),
+      ...blankP(1)
+    );
+  }
+
+  if (config.subjectType === "general" && content.thinkAnswers) {
+    children.push(
+      pgBreak(),
+      sectionHead("X", "Think and Answer.", "3 × 1 = 3"),
+      cInstr("(Answer each question in 1–2 sentences.)"),
       ...blankP(1),
       ...content.thinkAnswers.flatMap((ta) => [
         mkP(trB(ta.q, B_SZ), { spaceBef: 40, spaceAft: 20 }),
@@ -121,6 +149,7 @@ export async function buildQuestionPaper(
 
   if (isSocialStudies && content.sourcePassage && content.sourceQs) {
     children.push(
+      pgBreak(),
       sectionHead("X", "Read the passage and answer the questions.", "1 × 3 = 3"),
       cInstr("(Read the passage carefully. Answer each question based on the information in the passage.)"),
       ...blankP(1),
@@ -128,14 +157,14 @@ export async function buildQuestionPaper(
       ...blankP(1),
       ...content.sourceQs.flatMap((sq) => [
         mkP(trB(sq.q, B_SZ), { spaceBef: 40, spaceAft: 20 }),
-        ...writeLines(2),
+        ...writeLines(4),
       ]),
       ...blankP(1)
     );
   }
 
   // XI. Subject-specific
-  if (isScience) {
+  if (isScience && content.diagramQs && content.diagramQs.length > 0) {
     children.push(
       sectionHead("XI", sectionXITitle, "1 × 3 = 3"),
       cInstr(content.diagramLabel || "Study the diagram and answer the questions."),

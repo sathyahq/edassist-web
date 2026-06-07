@@ -2,15 +2,15 @@ import { Paragraph, Table, AlignmentType } from "docx";
 import type { PaperContent, ExamConfig } from "./types";
 import {
   tr, trB, trI, mkP, blankP, sectionHead, buildSchoolHeader,
-  buildDocxBlob, B_SZ, S_SZ, H_SZ,
+  buildDocxBlob, B_SZ, S_SZ, H_SZ, pgBreak,
 } from "./common";
 
 export async function buildAnswerKey(
   content: PaperContent,
   config: ExamConfig
 ): Promise<Blob> {
-  const isScience = !!content.thinkAnswers;
-  const isSocialStudies = !!content.sourcePassage;
+  const isScience = config.subjectType === "science";
+  const isSocialStudies = config.subjectType === "social-studies";
 
   const children: (Table | Paragraph)[] = [
     ...buildSchoolHeader(config, true),
@@ -54,18 +54,13 @@ export async function buildAnswerKey(
     ),
     ...blankP(1),
 
+    pgBreak(),
+
     // VI. Match Answers
     sectionHead("VI", "Match the following — ANSWERS", "5 × ½ = 2½"),
-    ...(content.matchA ? [
-      mkP(trB(content.matchA.title, S_SZ), { spaceBef: 40, spaceAft: 20 }),
-      ...Object.entries(content.matchA.answers).map(([k, v]) =>
-        mkP(tr(`  ${k} → ${v}`, { size: S_SZ }), { spaceAft: 10 })
-      ),
-      ...blankP(1),
-    ] : []),
-    ...(content.matchB ? [
-      mkP(trB(content.matchB.title, S_SZ), { spaceBef: 20, spaceAft: 20 }),
-      ...Object.entries(content.matchB.answers).map(([k, v]) =>
+    ...(content.match ? [
+      mkP(trB(content.match.title, S_SZ), { spaceBef: 40, spaceAft: 20 }),
+      ...Object.entries(content.match.answers).map(([k, v]) =>
         mkP(tr(`  ${k} → ${v}`, { size: S_SZ }), { spaceAft: 10 })
       ),
       ...blankP(1),
@@ -78,6 +73,8 @@ export async function buildAnswerKey(
       mkP([trI("Reason: ", S_SZ), trI(oo.reason, S_SZ)], { spaceAft: 20 }),
     ]),
     ...blankP(1),
+
+    pgBreak(),
 
     // VIII. Reasons Answers
     sectionHead("VIII", "Give reasons — ANSWERS", "4 × 1 = 4"),
@@ -99,6 +96,7 @@ export async function buildAnswerKey(
   // X. Subject-specific answers
   if (isScience && content.thinkAnswers) {
     children.push(
+      pgBreak(),
       sectionHead("X", "Think and Answer — ANSWERS", "1 × 3 = 3"),
       ...content.thinkAnswers.flatMap((ta) => [
         mkP(trB(ta.q, B_SZ), { spaceBef: 20, spaceAft: 10 }),
@@ -110,10 +108,23 @@ export async function buildAnswerKey(
 
   if (isSocialStudies && content.sourceQs) {
     children.push(
+      pgBreak(),
       sectionHead("X", "Source-based — ANSWERS", "1 × 3 = 3"),
       ...content.sourceQs.flatMap((sq) => [
         mkP(trB(sq.q, B_SZ), { spaceBef: 20, spaceAft: 10 }),
         mkP(tr(sq.ans), { spaceAft: 20 }),
+      ]),
+      ...blankP(1)
+    );
+  }
+
+  if (config.subjectType === "general" && content.thinkAnswers) {
+    children.push(
+      pgBreak(),
+      sectionHead("X", "Think and Answer — ANSWERS", "3 × 1 = 3"),
+      ...content.thinkAnswers.flatMap((ta) => [
+        mkP(trB(ta.q, B_SZ), { spaceBef: 20, spaceAft: 10 }),
+        mkP(tr(ta.ans), { spaceAft: 20 }),
       ]),
       ...blankP(1)
     );

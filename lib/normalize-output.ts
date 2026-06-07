@@ -68,61 +68,91 @@ function normalizeMatchSet(val: unknown): Record<string, unknown> | undefined {
 }
 
 function normalizeMatchFields(data: Record<string, unknown>): void {
-  const alt = data.match || data.matching || data.matchTheFollowing || data.match_the_following;
+  const alt = data.matching || data.matchTheFollowing || data.match_the_following;
 
-  if (!data.matchA && alt && isMatchSet(alt)) {
-    const m = alt as Record<string, unknown>;
-    const colA = ensureArray(m.colA || m.col_a || m.columnA) as string[];
-    const colB = ensureArray(m.colB || m.col_b || m.columnB) as string[];
-    const nums = ensureArray(m.nums || m.numbers) as string[];
-    const answers = (m.answers && typeof m.answers === "object" && !Array.isArray(m.answers))
-      ? m.answers as Record<string, string>
+  // If input already has `match` as a valid match set, use it directly
+  if (data.match && isMatchSet(data.match)) {
+    const normalized = normalizeMatchSet(data.match);
+    if (normalized) {
+      data.match = ensureMatchNums(normalized);
+    }
+    // Clean up legacy fields
+    delete data.matchA;
+    delete data.matchB;
+    return;
+  }
+
+  // If input has matchA + matchB, merge into single match
+  if (data.matchA && isMatchSet(data.matchA)) {
+    const mA = normalizeMatchSet(data.matchA)!;
+    const colA = ensureArray(mA.colA) as string[];
+    const colB = ensureArray(mA.colB) as string[];
+    const answers = (mA.answers && typeof mA.answers === "object" && !Array.isArray(mA.answers))
+      ? { ...(mA.answers as Record<string, string>) }
       : {} as Record<string, string>;
 
-    if (colA.length >= 3) {
-      data.matchA = {
-        title: String(m.title || "Match the following") + " (Set A)",
-        colA: colA.slice(0, 3),
-        colB: colB.slice(0, 3),
-        nums: nums.length >= 3 ? nums.slice(0, 3) : ["1", "2", "3"],
-        answers: Object.fromEntries(Object.entries(answers).slice(0, 3)),
-      };
-      if (colA.length >= 5) {
-        data.matchB = {
-          title: String(m.title || "Match the following") + " (Set B)",
-          colA: colA.slice(3, 5),
-          colB: colB.slice(3, 5),
-          nums: nums.length >= 5 ? nums.slice(3, 5) : ["4", "5"],
-          answers: Object.fromEntries(Object.entries(answers).slice(3, 5)),
-        };
+    if (data.matchB && isMatchSet(data.matchB)) {
+      const mB = normalizeMatchSet(data.matchB)!;
+      colA.push(...(ensureArray(mB.colA) as string[]));
+      colB.push(...(ensureArray(mB.colB) as string[]));
+      if (mB.answers && typeof mB.answers === "object" && !Array.isArray(mB.answers)) {
+        Object.assign(answers, mB.answers as Record<string, string>);
       }
-    } else {
-      data.matchA = normalizeMatchSet(alt);
     }
+
+    data.match = ensureMatchNums({
+      title: String(mA.title || "Match the following").replace(/ \(Set [AB]\)$/, ""),
+      colA,
+      colB,
+      nums: colA.map((_: unknown, i: number) => String(i + 1)),
+      answers,
+    });
+    delete data.matchA;
+    delete data.matchB;
+    return;
   }
 
-  if (data.matchA && !isMatchSet(data.matchA)) {
-    data.matchA = normalizeMatchSet(data.matchA);
-  }
-  if (data.matchB && !isMatchSet(data.matchB)) {
-    data.matchB = normalizeMatchSet(data.matchB);
+  // If input has matchA only (no matchB), use as match
+  if (data.matchA && isMatchSet(data.matchA)) {
+    const normalized = normalizeMatchSet(data.matchA);
+    if (normalized) {
+      data.match = ensureMatchNums(normalized);
+    }
+    delete data.matchA;
+    delete data.matchB;
+    return;
   }
 
-  if (data.matchA) {
-    const ma = data.matchA as Record<string, unknown>;
-    if (!ma.nums || !(ma.nums as unknown[]).length) {
-      const colA = ensureArray(ma.colA);
-      ma.nums = colA.map((_: unknown, i: number) => String(i + 1));
+  // If input has alternative field names (matching, matchTheFollowing, etc.)
+  if (alt && isMatchSet(alt)) {
+    const normalized = normalizeMatchSet(alt);
+    if (normalized) {
+      data.match = ensureMatchNums(normalized);
     }
+    delete data.matching;
+    delete data.matchTheFollowing;
+    delete data.match_the_following;
+    delete data.matchA;
+    delete data.matchB;
+    return;
   }
-  if (data.matchB) {
-    const mb = data.matchB as Record<string, unknown>;
-    if (!mb.nums || !(mb.nums as unknown[]).length) {
-      const colA = ensureArray(mb.colA);
-      const offset = data.matchA ? (ensureArray((data.matchA as Record<string, unknown>).colA)).length : 0;
-      mb.nums = colA.map((_: unknown, i: number) => String(offset + i + 1));
-    }
+
+  // No match data found — set to null
+  if (!data.match) {
+    data.match = null;
   }
+}
+
+function ensureMatchNums(match: Record<string, unknown>): Record<string, unknown> {
+  const colA = ensureArray(match.colA);
+  if (!match.nums || !(match.nums as unknown[]).length) {
+    match.nums = colA.map((_: unknown, i: number) => String(i + 1));
+  }
+  // Default to 5-item nums if missing
+  if ((match.nums as unknown[]).length < colA.length) {
+    match.nums = colA.map((_: unknown, i: number) => String(i + 1));
+  }
+  return match;
 }
 
 export function normalizeGeminiOutput(raw: unknown): Record<string, unknown> {

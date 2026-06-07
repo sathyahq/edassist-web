@@ -38,12 +38,11 @@ Return a single JSON object with the following structure. Follow the blueprint (
 
 Required fields:
 - mcqs: array of 10 objects with { q, opts (array of 4 strings), ans ("a"/"b"/"c"/"d"), bloom }
-- fibs: array of 10 tuples [sentence_with_blank_at_end, answer]
+- fibs: array of 10 tuples [sentence_with_blank, answer]. Fill in the blanks with the correct word.
 - whoAmI: array of 5 objects with { clue (ending with "Who am I?"), ans }
 - nameFollowing: array of 5 objects with { q, ans }
 - giveExamples: array of 5 objects with { q, ans }
-- matchA: object with { title, colA (array of 3 strings), colB (array of 3 strings), nums (["1","2","3"]), answers ({"1":"letter",...}) }
-- matchB: object with { title, colA (array of 2 strings), colB (array of 2 strings), nums (["4","5"]), answers ({"4":"letter","5":"letter"}) }
+- match: object with { title: "Match the following", colA (array of 5 strings), colB (array of 5 strings, shuffled), nums: ["1","2","3","4","5"], answers: {"1":"c","2":"e","3":"a","4":"b","5":"d"} }
 - oddOnes: array of 5 objects with { items (separated by " | "), odd, reason }
 - reasons: array of 4 objects with { q, pt (single point answer) }
 - shortAnswers: array of 5 objects with { q, ans (3-4 sentence model answer for grade 3-5, 1-2 for grade 1-2) }
@@ -53,24 +52,25 @@ ${subjectType === "science" ? `- thinkAnswers: array of 3 objects with { q, ans 
 - diagramQs: array of 3 objects with { q, ans } (diagram-based questions)` : ""}${subjectType === "social-studies" ? `- sourcePassage: string (passage from chapter content, 80-120 words)
 - sourceQs: array of 3 objects with { q, ans } (literal → inferential → evaluative)
 - mapQs: array of 3 strings (map instructions, e.g. "Mark and label the state of...")
-- mapAns: array of 3 strings (map answers)` : ""}
+- mapAns: array of 3 strings (map answers)` : ""}${subjectType === "general" ? `- thinkAnswers: array of 3 objects with { q, ans } (3 items, each 1-mark questions requiring 1-2 sentence answers)` : ""}
 
 CRITICAL RULES:
 1. Number each question within its section (1., 2., etc.) — MCQ options use a), b), c), d)
 2. Match Column B MUST be shuffled — no item in its positional match (1≠a, 2≠b, etc.)
 3. Each concept tested ONLY ONCE across all 11 sections (Rule 12)
 4. MCQs MUST be scenario-based with conceptual distractors (Rule 2)
-5. Fill in the blanks: blank ALWAYS at the END of the sentence
+5. Fill in the blanks with the correct word or phrase
 6. 1 mark = 1 response (Rule 6)
 7. Grade-appropriate language per Rule 1 (Grade ${input.grade})
 8. Content sourced ONLY from the provided chapter text — no external facts
+9. Section X marks: ${subjectType === "general" ? "3 × 1 = 3 (three 1-mark think-and-answer questions)" : "1 × 3 = 3"}
 
 Return ONLY the JSON object. No markdown fences. No explanation.`;
 }
 
-function getSubjectType(subject: string): "science" | "social-studies" | "evs" {
+export function getSubjectType(subject: string): "science" | "social-studies" | "general" {
   const lower = subject.toLowerCase();
-  if (lower === "evs") return "science";
+  if (lower === "evs" || lower === "science") return "science";
   if (lower.includes("social")) return "social-studies";
-  return "science";
+  return "general";
 }
