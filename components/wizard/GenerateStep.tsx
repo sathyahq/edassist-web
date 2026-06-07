@@ -9,6 +9,7 @@ import { buildQuestionPaper } from "@/lib/docx-builder/question-paper";
 import { buildAnswerKey } from "@/lib/docx-builder/answer-key";
 
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/build-prompt";
+import { buildReviewPrompt } from "@/lib/prompts/review-prompt";
 import type { ExamConfig, PaperContent } from "@/lib/docx-builder/types";
 import type { ExtractedChapter } from "@/lib/pdf-extract";
 import type { ExamConfigData } from "./ExamConfigStep";
@@ -27,6 +28,7 @@ interface Props {
 const PROGRESS_STEPS = [
   { key: "sending", label: "Connect" },
   { key: "generating", label: "Generate" },
+  { key: "reviewing", label: "Review" },
   { key: "building", label: "Build" },
 ] as const;
 
@@ -278,8 +280,19 @@ export default function GenerateStep({
         throw new Error(`AI returned invalid JSON. First 200 chars: ${fullText.slice(0, 200)}`);
       }
 
-      // Review pass disabled — saves 1 API call per generation.
-      // Programmatic content validator handles quality checks instead.
+      // Review pass — AI checks its own output for quality issues
+      setStatus("reviewing");
+      try {
+        const reviewPrompt = buildReviewPrompt(JSON.stringify(parsed), examConfig.grade);
+        const reviewText = await callGemini(systemPrompt, reviewPrompt);
+        const cleanReview = reviewText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/, "").trim();
+        const review = JSON.parse(cleanReview);
+        if (review.fixedPaper) {
+          Object.assign(parsed, review.fixedPaper);
+        }
+      } catch {
+        // review is optional — continue with original if it fails
+      }
 
       const normalized = normalizeGeminiOutput(parsed);
       const validated = paperContentSchema.parse(normalized) as PaperContent;
