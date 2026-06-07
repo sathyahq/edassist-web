@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function SchoolInfoStep({ onNext }: Props) {
-  const [schoolName, setSchoolName] = useState("");
+  const [schoolName, setSchoolName] = useState("Dr. Dasarathan International School, Coimbatore");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [hasSaved, setHasSaved] = useState(false);
@@ -25,7 +25,7 @@ export default function SchoolInfoStep({ onNext }: Props) {
     const saved = localStorage.getItem("edassist_school");
     if (saved) {
       const parsed = JSON.parse(saved);
-      setSchoolName(parsed.schoolName || "");
+      if (parsed.schoolName) setSchoolName(parsed.schoolName);
       if (parsed.logoPreview) setLogoPreview(parsed.logoPreview);
       setHasSaved(true);
     }
