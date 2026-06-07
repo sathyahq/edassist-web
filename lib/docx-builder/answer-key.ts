@@ -56,11 +56,13 @@ export async function buildAnswerKey(
 
     // VI. Match Answers
     sectionHead("VI", "Match the following — ANSWERS", "5 × ½ = 2½"),
-    mkP(trB(content.matchA.title, S_SZ), { spaceBef: 40, spaceAft: 20 }),
-    ...Object.entries(content.matchA.answers).map(([k, v]) =>
-      mkP(tr(`  ${k} → ${v}`, { size: S_SZ }), { spaceAft: 10 })
-    ),
-    ...blankP(1),
+    ...(content.matchA ? [
+      mkP(trB(content.matchA.title, S_SZ), { spaceBef: 40, spaceAft: 20 }),
+      ...Object.entries(content.matchA.answers).map(([k, v]) =>
+        mkP(tr(`  ${k} → ${v}`, { size: S_SZ }), { spaceAft: 10 })
+      ),
+      ...blankP(1),
+    ] : []),
     ...(content.matchB ? [
       mkP(trB(content.matchB.title, S_SZ), { spaceBef: 20, spaceAft: 20 }),
       ...Object.entries(content.matchB.answers).map(([k, v]) =>

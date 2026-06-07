@@ -29,7 +29,7 @@ export const paperContentSchema = z.object({
   whoAmI: z.array(clueSchema).min(1),
   nameFollowing: z.array(qaSchema).min(1),
   giveExamples: z.array(qaSchema).min(1),
-  matchA: matchSetSchema,
+  matchA: matchSetSchema.nullable().optional(),
   matchB: matchSetSchema.nullable().optional(),
   oddOnes: z.array(oddOneSchema).min(1),
   reasons: z.array(reasonSchema).min(1),

@@ -64,11 +64,13 @@ export async function buildQuestionPaper(
 
     // VI. Match the Following
     sectionHead("VI", "Match the following.", "5 × ½ = 2½"),
-    cInstr("(Two sets. Write the matching letter or number in the Answer column.)"),
+    cInstr("(Write the matching letter or number in the Answer column.)"),
     ...blankP(1),
-    mkP(trB(content.matchA.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
-    matchTable(content.matchA.colA, content.matchA.colB, content.matchA.nums),
-    ...blankP(1),
+    ...(content.matchA ? [
+      mkP(trB(content.matchA.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
+      matchTable(content.matchA.colA, content.matchA.colB, content.matchA.nums),
+      ...blankP(1),
+    ] : []),
     ...(content.matchB ? [
       mkP(trB(content.matchB.title, S_SZ), { spaceBef: 40, spaceAft: 40 }),
       matchTable(content.matchB.colA, content.matchB.colB, content.matchB.nums),

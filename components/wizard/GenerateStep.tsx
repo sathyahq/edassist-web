@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { paperContentSchema } from "@/lib/schemas/paper-content";
+import { ZodError } from "zod";
 import { buildQuestionPaper } from "@/lib/docx-builder/question-paper";
 import { buildAnswerKey } from "@/lib/docx-builder/answer-key";
 import { processLogoForDocx } from "@/lib/image-utils";
@@ -217,11 +218,15 @@ export default function GenerateStep({
       setStatus("done");
     } catch (err) {
       setStatus("error");
-      setErrorMsg(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again."
-      );
+      if (err instanceof ZodError) {
+        setErrorMsg("AI response didn't match expected format. Please try again — each run varies slightly.");
+      } else {
+        setErrorMsg(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong. Please try again."
+        );
+      }
     }
   }, [examConfig, chapters, schoolName, logoFile, dateFormatted]);
 

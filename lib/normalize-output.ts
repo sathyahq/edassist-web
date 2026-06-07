@@ -47,6 +47,84 @@ function normalizeFib(fib: unknown): [string, string] {
   return ["", ""];
 }
 
+function isMatchSet(val: unknown): val is Record<string, unknown> {
+  if (!val || typeof val !== "object" || Array.isArray(val)) return false;
+  const obj = val as Record<string, unknown>;
+  return !!(obj.colA || obj.colB || obj.col_a || obj.col_b || obj.columnA || obj.columnB);
+}
+
+function normalizeMatchSet(val: unknown): Record<string, unknown> | undefined {
+  if (!isMatchSet(val)) return undefined;
+  const obj = val as Record<string, unknown>;
+  return {
+    title: String(obj.title || "Match the following"),
+    colA: ensureArray(obj.colA || obj.col_a || obj.columnA || obj.column_a),
+    colB: ensureArray(obj.colB || obj.col_b || obj.columnB || obj.column_b),
+    nums: ensureArray(obj.nums || obj.numbers),
+    answers: (obj.answers && typeof obj.answers === "object" && !Array.isArray(obj.answers))
+      ? obj.answers
+      : {},
+  };
+}
+
+function normalizeMatchFields(data: Record<string, unknown>): void {
+  const alt = data.match || data.matching || data.matchTheFollowing || data.match_the_following;
+
+  if (!data.matchA && alt && isMatchSet(alt)) {
+    const m = alt as Record<string, unknown>;
+    const colA = ensureArray(m.colA || m.col_a || m.columnA) as string[];
+    const colB = ensureArray(m.colB || m.col_b || m.columnB) as string[];
+    const nums = ensureArray(m.nums || m.numbers) as string[];
+    const answers = (m.answers && typeof m.answers === "object" && !Array.isArray(m.answers))
+      ? m.answers as Record<string, string>
+      : {} as Record<string, string>;
+
+    if (colA.length >= 3) {
+      data.matchA = {
+        title: String(m.title || "Match the following") + " (Set A)",
+        colA: colA.slice(0, 3),
+        colB: colB.slice(0, 3),
+        nums: nums.length >= 3 ? nums.slice(0, 3) : ["1", "2", "3"],
+        answers: Object.fromEntries(Object.entries(answers).slice(0, 3)),
+      };
+      if (colA.length >= 5) {
+        data.matchB = {
+          title: String(m.title || "Match the following") + " (Set B)",
+          colA: colA.slice(3, 5),
+          colB: colB.slice(3, 5),
+          nums: nums.length >= 5 ? nums.slice(3, 5) : ["4", "5"],
+          answers: Object.fromEntries(Object.entries(answers).slice(3, 5)),
+        };
+      }
+    } else {
+      data.matchA = normalizeMatchSet(alt);
+    }
+  }
+
+  if (data.matchA && !isMatchSet(data.matchA)) {
+    data.matchA = normalizeMatchSet(data.matchA);
+  }
+  if (data.matchB && !isMatchSet(data.matchB)) {
+    data.matchB = normalizeMatchSet(data.matchB);
+  }
+
+  if (data.matchA) {
+    const ma = data.matchA as Record<string, unknown>;
+    if (!ma.nums || !(ma.nums as unknown[]).length) {
+      const colA = ensureArray(ma.colA);
+      ma.nums = colA.map((_: unknown, i: number) => String(i + 1));
+    }
+  }
+  if (data.matchB) {
+    const mb = data.matchB as Record<string, unknown>;
+    if (!mb.nums || !(mb.nums as unknown[]).length) {
+      const colA = ensureArray(mb.colA);
+      const offset = data.matchA ? (ensureArray((data.matchA as Record<string, unknown>).colA)).length : 0;
+      mb.nums = colA.map((_: unknown, i: number) => String(offset + i + 1));
+    }
+  }
+}
+
 export function normalizeGeminiOutput(raw: unknown): Record<string, unknown> {
   if (!raw || typeof raw !== "object") {
     throw new Error("AI returned non-object response");
@@ -74,12 +152,21 @@ export function normalizeGeminiOutput(raw: unknown): Record<string, unknown> {
       if (mcq.opts && !Array.isArray(mcq.opts)) {
         mcq.opts = Object.values(mcq.opts as Record<string, unknown>);
       }
+      if (mcq.options && !mcq.opts) {
+        mcq.opts = Array.isArray(mcq.options)
+          ? mcq.options
+          : Object.values(mcq.options as Record<string, unknown>);
+        delete mcq.options;
+      }
       if (mcq.ans && typeof mcq.ans === "string") {
         mcq.ans = mcq.ans.toLowerCase().trim().charAt(0);
       }
+      if (!mcq.bloom) mcq.bloom = "Understand";
       return mcq;
     });
   }
+
+  normalizeMatchFields(data);
 
   return data;
 }

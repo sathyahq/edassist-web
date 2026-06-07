@@ -40,7 +40,7 @@ export interface PaperContent {
   whoAmI: ClueItem[];
   nameFollowing: QAItem[];
   giveExamples: QAItem[];
-  matchA: MatchSet;
+  matchA?: MatchSet | null;
   matchB?: MatchSet | null;
   oddOnes: OddOneItem[];
   reasons: ReasonItem[];
