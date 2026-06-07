@@ -159,7 +159,7 @@ export const matchTable = (colA: string[], colB: string[], nums: string[]) =>
               width: { size: 18, type: WidthType.PERCENTAGE },
               borders: BOX_BORDER,
               margins: { top: 40, bottom: 40, left: 60, right: 40 },
-              children: [mkP(tr(`${nums[i]} → ___`, { size: S_SZ }), { align: C.CENTER })],
+              children: [mkP(tr(`${nums[i] ?? String(i + 1)} → ___`, { size: S_SZ }), { align: C.CENTER })],
             }),
           ],
         })

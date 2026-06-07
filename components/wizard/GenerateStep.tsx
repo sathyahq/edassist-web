@@ -106,6 +106,20 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
     }
   }
 
+  if (buffer.trim()) {
+    const remaining = buffer.trim();
+    if (remaining.startsWith("data: ")) {
+      const data = remaining.slice(6).trim();
+      if (data && data !== "[DONE]") {
+        try {
+          const parsed = JSON.parse(data);
+          const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) fullText += text;
+        } catch {}
+      }
+    }
+  }
+
   if (!fullText.trim()) {
     throw new Error("AI returned empty response. Try again.");
   }
@@ -147,7 +161,8 @@ export default function GenerateStep({
       });
 
       setStatus("generating");
-      const fullText = await callGemini(systemPrompt, userPrompt);
+      let fullText = await callGemini(systemPrompt, userPrompt);
+      fullText = fullText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/, "").trim();
       let parsed;
       try {
         parsed = JSON.parse(fullText);

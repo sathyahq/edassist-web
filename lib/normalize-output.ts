@@ -13,8 +13,14 @@ function deepCoerceStrings(obj: unknown): unknown {
 
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-    if (STRING_FIELDS.has(key) && Array.isArray(value)) {
-      result[key] = value.filter((v) => v != null).join(". ");
+    if (STRING_FIELDS.has(key)) {
+      if (Array.isArray(value)) {
+        result[key] = value.filter((v) => v != null).join(". ");
+      } else if (value != null && typeof value !== "string") {
+        result[key] = String(value);
+      } else {
+        result[key] = value;
+      }
     } else {
       result[key] = deepCoerceStrings(value);
     }
