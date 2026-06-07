@@ -57,6 +57,7 @@ export interface PaperContent {
 export interface ExamConfig {
   schoolName: string;
   logoBuffer: ArrayBuffer | null;
+  diagramBuffer: ArrayBuffer | null;
   grade: number;
   gradeDisplay: string;
   subject: string;

@@ -63,6 +63,40 @@ async function getApiKey(): Promise<string> {
   return data.key;
 }
 
+async function generateDiagram(label: string, grade: number): Promise<ArrayBuffer | null> {
+  try {
+    const apiKey = await getApiKey();
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-image-generation:generateContent?key=${apiKey}`;
+    const prompt = `Generate a simple, clear, black and white labeled educational diagram of "${label}" for a Grade ${grade} science exam paper. Style: clean line art, no color, no shading, clear text labels with arrows pointing to parts. White background. Suitable for printing on paper.`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+        },
+      }),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        const binary = atob(part.inlineData.data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes.buffer;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function callGemini(systemPrompt: string, userPrompt: string, retries = 2): Promise<string> {
   const apiKey = await getApiKey();
 
@@ -316,9 +350,16 @@ export default function GenerateStep({
         }
       } catch {}
 
+      // Generate diagram for science subjects if diagramLabel exists
+      let diagramBuffer: ArrayBuffer | null = null;
+      if (validated.diagramLabel && validated.diagramQs?.length) {
+        diagramBuffer = await generateDiagram(validated.diagramLabel, examConfig.grade);
+      }
+
       const config: ExamConfig = {
         schoolName,
         logoBuffer,
+        diagramBuffer,
         grade: examConfig.grade,
         gradeDisplay: ROMAN[examConfig.grade] || String(examConfig.grade),
         subject: examConfig.subject.toLowerCase().replace(/\s+/g, "-"),

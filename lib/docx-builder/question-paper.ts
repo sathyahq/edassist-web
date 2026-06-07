@@ -1,10 +1,10 @@
-import { Paragraph, Table, AlignmentType } from "docx";
+import { Paragraph, Table, AlignmentType, ImageRun } from "docx";
 import type { PaperContent, ExamConfig } from "./types";
 import {
   tr, trB, trI, mkP, blankP, ruleLine, writeLines,
   sectionHead, matchTable, passageBox, placeholderBox,
   cInstr, buildSchoolHeader, buildDocxBlob, B_SZ, S_SZ,
-  pgBreak, generalInstructions,
+  pgBreak, generalInstructions, SPACING,
 } from "./common";
 
 export async function buildQuestionPaper(
@@ -165,11 +165,25 @@ export async function buildQuestionPaper(
 
   // XI. Subject-specific
   if (isScience && content.diagramQs && content.diagramQs.length > 0) {
+    const diagramElement = config.diagramBuffer
+      ? new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: SPACING,
+          children: [
+            new ImageRun({
+              data: config.diagramBuffer,
+              transformation: { width: 350, height: 280 },
+              type: "png",
+            }),
+          ],
+        })
+      : placeholderBox("[ DIAGRAM — Attach / Print the diagram here ]");
+
     children.push(
       sectionHead("XI", sectionXITitle, "1 × 3 = 3"),
       cInstr(content.diagramLabel || "Study the diagram and answer the questions."),
       ...blankP(1),
-      placeholderBox("[ DIAGRAM — Attach / Print the diagram here ]"),
+      diagramElement,
       ...blankP(1),
       ...(content.diagramQs || []).flatMap((dq) => [
         mkP(trB(dq.q, B_SZ), { spaceBef: 40, spaceAft: 20 }),
