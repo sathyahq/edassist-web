@@ -34,15 +34,27 @@ const STATUS_MESSAGES: Record<Status, string> = {
 };
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ systemPrompt, userPrompt }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ systemPrompt, userPrompt }),
+    });
+  } catch (networkErr) {
+    throw new Error(`Network error: ${networkErr instanceof Error ? networkErr.message : "Failed to connect"}`);
+  }
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Generation failed" }));
-    throw new Error(err.error || "Generation failed");
+    const rawText = await response.text().catch(() => "");
+    let errorMessage: string;
+    try {
+      const err = JSON.parse(rawText);
+      errorMessage = err.error || `HTTP ${response.status}`;
+    } catch {
+      errorMessage = `HTTP ${response.status}: ${rawText.slice(0, 300) || response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
 
   const reader = response.body?.getReader();
@@ -55,6 +67,11 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
     if (done) break;
     fullText += decoder.decode(value, { stream: true });
   }
+
+  if (!fullText.trim()) {
+    throw new Error("AI returned empty response. Try again.");
+  }
+
   return fullText;
 }
 
@@ -93,7 +110,12 @@ export default function GenerateStep({
 
       setStatus("generating");
       const fullText = await callGemini(systemPrompt, userPrompt);
-      const parsed = JSON.parse(fullText);
+      let parsed;
+      try {
+        parsed = JSON.parse(fullText);
+      } catch {
+        throw new Error(`AI returned invalid JSON. First 200 chars: ${fullText.slice(0, 200)}`);
+      }
 
       // Review pass
       setStatus("reviewing");
@@ -202,8 +224,12 @@ export default function GenerateStep({
 
       {status === "error" && (
         <div className="text-center py-8">
-          <p className="text-lg font-semibold text-red-600 mb-4">
-            {errorMsg || "Something went wrong. Please try again."}
+          <p className="text-lg font-semibold text-red-600 mb-2">Generation Failed</p>
+          <p className="text-sm text-red-500 mb-1 px-4 wrap-break-word">
+            {errorMsg || "Unknown error"}
+          </p>
+          <p className="text-xs text-gray-400 mb-4">
+            Chapters: {chapters.length} | Text size: {Math.round(chapters.reduce((s, c) => s + c.text.length, 0) / 1024)}KB
           </p>
           <Button onClick={generate} className="h-14 text-lg bg-teal-600 rounded-xl px-8">
             Try Again
