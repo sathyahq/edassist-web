@@ -63,7 +63,7 @@ async function getApiKey(): Promise<string> {
   return data.key;
 }
 
-async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+async function callGemini(systemPrompt: string, userPrompt: string, retries = 2): Promise<string> {
   const apiKey = await getApiKey();
 
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
@@ -97,6 +97,10 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   if (!response.ok) {
     clearTimeout(timeout);
     const errText = await response.text().catch(() => "");
+    if (response.status === 429 && retries > 0) {
+      await new Promise((r) => setTimeout(r, 15000));
+      return callGemini(systemPrompt, userPrompt, retries - 1);
+    }
     if (response.status === 429) {
       throw new Error("AI rate limit hit. Wait a minute and try again.");
     }
@@ -276,17 +280,18 @@ export default function GenerateStep({
         throw new Error(`AI returned invalid JSON. First 200 chars: ${fullText.slice(0, 200)}`);
       }
 
-      // Review pass
+      // Review pass — skip to save quota, catch 429/errors gracefully
       setStatus("reviewing");
       try {
         const reviewPrompt = buildReviewPrompt(JSON.stringify(parsed), examConfig.grade);
         const reviewText = await callGemini(systemPrompt, reviewPrompt);
-        const review = JSON.parse(reviewText);
+        const cleanReview = reviewText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/, "").trim();
+        const review = JSON.parse(cleanReview);
         if (review.fixedPaper) {
           Object.assign(parsed, review.fixedPaper);
         }
       } catch {
-        // review is optional — continue with original
+        // review is optional — continue with original (rate limit, timeout, etc.)
       }
 
       const normalized = normalizeGeminiOutput(parsed);
