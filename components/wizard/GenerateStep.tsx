@@ -9,7 +9,6 @@ import { buildQuestionPaper } from "@/lib/docx-builder/question-paper";
 import { buildAnswerKey } from "@/lib/docx-builder/answer-key";
 
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts/build-prompt";
-import { buildReviewPrompt } from "@/lib/prompts/review-prompt";
 import type { ExamConfig, PaperContent } from "@/lib/docx-builder/types";
 import type { ExtractedChapter } from "@/lib/pdf-extract";
 import type { ExamConfigData } from "./ExamConfigStep";
@@ -28,7 +27,6 @@ interface Props {
 const PROGRESS_STEPS = [
   { key: "sending", label: "Connect" },
   { key: "generating", label: "Generate" },
-  { key: "reviewing", label: "Review" },
   { key: "building", label: "Build" },
 ] as const;
 
@@ -36,7 +34,7 @@ const STATUS_MESSAGES: Record<Status, string> = {
   idle: "",
   sending: "Connecting to AI...",
   generating: "Generating questions... This takes about 30-60 seconds",
-  reviewing: "Reviewing quality... Almost done",
+  reviewing: "Almost done...",
   building: "Building your question paper...",
   done: "Your question paper is ready!",
   error: "",
@@ -280,19 +278,8 @@ export default function GenerateStep({
         throw new Error(`AI returned invalid JSON. First 200 chars: ${fullText.slice(0, 200)}`);
       }
 
-      // Review pass — skip to save quota, catch 429/errors gracefully
-      setStatus("reviewing");
-      try {
-        const reviewPrompt = buildReviewPrompt(JSON.stringify(parsed), examConfig.grade);
-        const reviewText = await callGemini(systemPrompt, reviewPrompt);
-        const cleanReview = reviewText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/, "").trim();
-        const review = JSON.parse(cleanReview);
-        if (review.fixedPaper) {
-          Object.assign(parsed, review.fixedPaper);
-        }
-      } catch {
-        // review is optional — continue with original (rate limit, timeout, etc.)
-      }
+      // Review pass disabled — saves 1 API call per generation.
+      // Programmatic content validator handles quality checks instead.
 
       const normalized = normalizeGeminiOutput(parsed);
       const validated = paperContentSchema.parse(normalized) as PaperContent;
